@@ -2,16 +2,19 @@ import 'dart:developer';
 
 import 'package:chat_app/core/constant/app_globals.dart';
 import 'package:chat_app/model/user_data_model.dart';
+import 'package:chat_app/view_model/chat_view_model.dart';
 import 'package:chat_app/view_model/messaging_view_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-class UserDataServices extends ChangeNotifier {
+class UserDataServices with ChangeNotifier {
   CollectionReference userDataCollection =
       FirebaseFirestore.instance.collection('userCollection');
   MessagingViewModel messagingViewModel = MessagingViewModel();
+  ChatViewModel chatViewModel = ChatViewModel();
+  String? lastMessagesLength;
   List userDataList = [];
   List onlineUsersList = [];
   final userCollection =
@@ -102,6 +105,12 @@ class UserDataServices extends ChangeNotifier {
           (element) => element.id == FirebaseAuth.instance.currentUser?.uid);
       userDataList.add(UserDataModel.fromMap(element.data()));
     }
+    notifyListeners();
+  }
+
+  getLengthofLastMessages(String reciverId) {
+    var a = chatViewModel.getlength(reciverId);
+    lastMessagesLength = a.toString();
     notifyListeners();
   }
 }

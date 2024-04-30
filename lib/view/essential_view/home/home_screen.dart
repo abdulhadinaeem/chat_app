@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:developer';
+import 'package:chat_app/core/constant/app_globals.dart';
+import 'package:chat_app/core/constant/app_images.dart';
 import 'package:chat_app/core/constant/route_names.dart';
 import 'package:chat_app/main.dart';
 import 'package:chat_app/model/user_data_model.dart';
 import 'package:chat_app/view_model/messaging_view_model.dart';
 import 'package:chat_app/view_model/user_data_view_model.dart';
+import 'package:chat_app/widgets/progress_indicator/custom_progress_indicator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -26,8 +29,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     WidgetsBinding.instance.addObserver(this);
     final provider = Provider.of<UserDataServices>(context, listen: false);
+
     // provider.getUserData();
+
     provider.setStatus('Online');
+
     super.initState();
   }
 
@@ -47,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<UserDataServices>(context);
+
     return StreamBuilder<QuerySnapshot>(
       stream: userCollection,
       builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
@@ -54,7 +61,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           return Center(child: Text(snapshot.error.toString()));
         } else if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
+              body: AlertDialog(
+            content: CustomProgressIndicator(),
+          ));
         } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Scaffold(body: Center(child: Text('No User Found')));
         }
@@ -176,8 +185,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   children: [
                                     const CircleAvatar(
                                       radius: 36,
-                                      backgroundImage: NetworkImage(
-                                          'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'),
+                                      backgroundImage:
+                                          NetworkImage(AppImages.profilePic),
                                     ),
                                     Text(
                                       userDataList[index].name ?? "",
@@ -218,10 +227,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             return ListTile(
                               leading: const CircleAvatar(
                                 radius: 20,
-                                backgroundImage: NetworkImage(
-                                    'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'),
+                                backgroundImage:
+                                    NetworkImage(AppImages.profilePic),
                               ),
                               title: Text(userData.name ?? ""),
+                              trailing: lastMessages == null
+                                  ? const SizedBox.shrink()
+                                  : CircleAvatar(
+                                      radius: 10,
+                                      child: Text(lastMessages.toString()),
+                                    ),
                               onTap: () {
                                 if (userData.name != null &&
                                     userData.id != null) {

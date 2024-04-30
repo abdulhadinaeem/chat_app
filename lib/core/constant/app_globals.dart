@@ -1,1 +1,2 @@
 String currentUserName = '';
+int? lastMessages;

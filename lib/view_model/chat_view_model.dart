@@ -5,16 +5,17 @@ import 'package:chat_app/model/converstion_model.dart';
 import 'package:chat_app/view_model/messaging_view_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as https;
 
-class ChatViewModel extends ChangeNotifier {
+class ChatViewModel with ChangeNotifier {
   final FirebaseAuth auth = FirebaseAuth.instance;
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   CollectionReference converstionsCollection =
       FirebaseFirestore.instance.collection('converstions');
+
   String? conversationId;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -58,9 +59,7 @@ class ChatViewModel extends ChangeNotifier {
       sendNotificationToUser(receiverToken, message);
       notifyListeners();
     } else {
-      // If no conversation exists, create a new one and retry sending the message
       createConversations(receiverId);
-      // Retry sending the message
       sendMessage(receiverId, message, receiverToken);
     }
   }
@@ -147,7 +146,6 @@ class ChatViewModel extends ChangeNotifier {
           .orderBy('timestamp', descending: true)
           .snapshots();
     } else {
-      // Return an empty stream if conversationId is null
       yield* const Stream.empty();
     }
   }
@@ -165,10 +163,14 @@ class ChatViewModel extends ChangeNotifier {
 
       if (existingConversations.docs.isEmpty) {
         final model =
-            ConverstionModel(userIds: userIds, conversationsUserData: {
-          'UserId': currentUserUid,
-          'lastMessageSend': lastSeen,
-        });
+            ConverstionModel(userIds: userIds, conversationsUserData: [
+          ConversationsUserDataModel(
+                  lastSeen: lastSeen ?? Timestamp.now(), userId: currentUserUid)
+              .toMap(),
+          ConversationsUserDataModel(
+                  lastSeen: lastSeen ?? Timestamp.now(), userId: receiverId)
+              .toMap(),
+        ]);
 
         final Map<String, dynamic> data = model.toMap();
 
@@ -180,16 +182,80 @@ class ChatViewModel extends ChangeNotifier {
 
         await docRef.update(updatedData);
       } else {
-        // final conversationId = existingConversations.docs.first.id;
-        converstionsCollection.doc(conversationId).update({
-          'conversationsUserData': [
-            {'lastMessageSend': lastSeen}
-          ]
-        });
+        log('Last Seen $lastSeen');
+        final conversationId = existingConversations.docs.first.id;
+        final Map<String, dynamic> existingData =
+            existingConversations.docs.first.data() as Map<String, dynamic>;
+
+        existingData[currentUserUid]['lastMessageSend'] = lastSeen;
+
+        existingData[receiverId]['lastMessageSend'] = lastSeen;
+        updateConversation(
+            currentUserUid, receiverId, lastSeen ?? Timestamp.now());
       }
       return true;
     } on Exception catch (e) {
+      log('Error: ${e.toString()}');
       return false;
     }
+  }
+
+  Future<void> updateConversation(
+      String currentUserUid, String receiverId, Timestamp lastSeen) async {
+    try {
+      final conversationDoc =
+          await converstionsCollection.doc(conversationId).get();
+      if (conversationDoc.exists) {
+        final data = conversationDoc.data() as Map<String, dynamic>;
+        final conversationsUserData =
+            data['conversationsUserData'] as List<dynamic>;
+
+        for (int i = 0; i < conversationsUserData.length; i++) {
+          final userData = conversationsUserData[i] as Map<String, dynamic>;
+          if (userData['userId'] == currentUserUid) {
+            userData['lastMessageSend'] = lastSeen;
+            conversationsUserData[i] = userData;
+            break;
+          }
+        }
+
+        await converstionsCollection.doc(conversationId).update({
+          'conversationsUserData': conversationsUserData,
+        });
+
+        notifyListeners();
+      } else {
+        log('Conversation document does not exist');
+      }
+    } catch (e) {
+      log('Error updating conversation: $e');
+    }
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> getLastMessages(
+      String userCurrentId, String receiverId, Timestamp lastSeen) async* {
+    List<String> ids = [userCurrentId, receiverId];
+    ids.sort();
+    String chatRoomId = ids.join('_');
+    await getIds(ids);
+    log('conversationId: $conversationId');
+    if (conversationId != null) {
+      yield* converstionsCollection
+          .doc(conversationId!)
+          .collection('messages')
+          .where('timestamp', isGreaterThan: lastSeen)
+          .snapshots();
+    } else {
+      yield* const Stream.empty();
+    }
+  }
+
+  Future<int> getlength(String reciverId) async {
+    final document = await converstionsCollection.doc(conversationId).get();
+
+    final timeStamp = Timestamp.now();
+    final a = getLastMessages(auth.currentUser!.uid, reciverId, timeStamp);
+    a.toList();
+    return a.length;
   }
 }
