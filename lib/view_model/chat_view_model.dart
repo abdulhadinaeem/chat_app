@@ -82,8 +82,7 @@ class ChatViewModel with ChangeNotifier {
       Uri.parse('https://fcm.googleapis.com/fcm/send'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization':
-            'key=AAAAmx_gE_0:APA91bFo_afy4NtGwcdbh_0TVK4qwcVgRSD_C9WoT1cEKbyVXUySwE5jljeV65GC9VW2RikM6Cp9mXaKCoVeP-0gZkTd-wauRyrMm01JH_trPsnwQP8Z5Wov3BPN_2QcjqBatfCzKZSS', // Replace with your server key
+        'Authorization': 'key=Server Key',
       },
       body: jsonEncode(messageBody),
     );
