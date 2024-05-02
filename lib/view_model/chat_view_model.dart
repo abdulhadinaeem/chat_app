@@ -11,6 +11,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as https;
 
 class ChatViewModel with ChangeNotifier {
+  String? reciverId;
+  Timestamp? storeLastseen;
   final FirebaseAuth auth = FirebaseAuth.instance;
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   CollectionReference converstionsCollection =
@@ -82,7 +84,8 @@ class ChatViewModel with ChangeNotifier {
       Uri.parse('https://fcm.googleapis.com/fcm/send'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'key=Server Key  ',
+        'Authorization':
+            'key=AAAAmx_gE_0:APA91bFo_afy4NtGwcdbh_0TVK4qwcVgRSD_C9WoT1cEKbyVXUySwE5jljeV65GC9VW2RikM6Cp9mXaKCoVeP-0gZkTd-wauRyrMm01JH_trPsnwQP8Z5Wov3BPN_2QcjqBatfCzKZSS',
       },
       body: jsonEncode(messageBody),
     );
@@ -229,32 +232,5 @@ class ChatViewModel with ChangeNotifier {
     } catch (e) {
       log('Error updating conversation: $e');
     }
-  }
-
-  Stream<QuerySnapshot<Map<String, dynamic>>> getLastMessages(
-      String userCurrentId, String receiverId, Timestamp lastSeen) async* {
-    List<String> ids = [userCurrentId, receiverId];
-    ids.sort();
-    String chatRoomId = ids.join('_');
-    await getIds(ids);
-    log('conversationId: $conversationId');
-    if (conversationId != null) {
-      yield* converstionsCollection
-          .doc(conversationId!)
-          .collection('messages')
-          .where('timestamp', isGreaterThan: lastSeen)
-          .snapshots();
-    } else {
-      yield* const Stream.empty();
-    }
-  }
-
-  Future<int> getlength(String reciverId) async {
-    final document = await converstionsCollection.doc(conversationId).get();
-
-    final timeStamp = Timestamp.now();
-    final a = getLastMessages(auth.currentUser!.uid, reciverId, timeStamp);
-    a.toList();
-    return a.length;
   }
 }

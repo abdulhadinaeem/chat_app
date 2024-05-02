@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:chat_app/core/constant/app_globals.dart';
@@ -8,13 +9,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
 
 class UserDataServices with ChangeNotifier {
   CollectionReference userDataCollection =
       FirebaseFirestore.instance.collection('userCollection');
+  CollectionReference converstionsCollection =
+      FirebaseFirestore.instance.collection('converstions');
+
+  String? conversationId;
   MessagingViewModel messagingViewModel = MessagingViewModel();
   ChatViewModel chatViewModel = ChatViewModel();
   String? lastMessagesLength;
+  StreamSubscription? _unreadMessagesSubscription;
+  String? reciverId;
+  Timestamp? userLastSeen;
+  final FirebaseAuth auth = FirebaseAuth.instance;
   List userDataList = [];
   List onlineUsersList = [];
   final userCollection =
@@ -70,8 +80,11 @@ class UserDataServices with ChangeNotifier {
 
       notifyListeners();
 
-      return userDataCollection.add(user.toMap()).then((value) {
+      DocumentReference ref =
+          userDataCollection.doc(FirebaseAuth.instance.currentUser?.uid);
+      ref.set(user.toMap()).then((value) {
         userDataList.add(user);
+
         notifyListeners();
       });
     });
@@ -108,9 +121,56 @@ class UserDataServices with ChangeNotifier {
     notifyListeners();
   }
 
-  getLengthofLastMessages(String reciverId) {
-    var a = chatViewModel.getlength(reciverId);
-    lastMessagesLength = a.toString();
-    notifyListeners();
+  getIds() async {
+    List<String> ids = [auth.currentUser!.uid, reciverId!];
+    final existingConversations =
+        await converstionsCollection.where('userIds', isEqualTo: ids).get();
+    conversationId = existingConversations.docs.first.id;
+  }
+
+  void startListeningForUnreadMessages() {
+    _unreadMessagesSubscription =
+        Stream.periodic(const Duration(seconds: 2)).listen((_) {
+      fetchLastSeenTime();
+      notifyListeners();
+    });
+  }
+
+  void stopListeningForUnreadMessages() {
+    _unreadMessagesSubscription?.cancel();
+  }
+
+  Future<void> fetchLastSeenTime() async {
+    try {
+      final currentUserUid = FirebaseAuth.instance.currentUser!.uid;
+      final existingConversations = await converstionsCollection
+          .where('userIds', arrayContains: currentUserUid)
+          .get();
+
+      for (final doc in existingConversations.docs) {
+        Map data = doc.data() as Map<String, dynamic>;
+        final conversationUserData = data['conversationsUserData'];
+
+        final userLastSeen = conversationUserData.firstWhere((userData) =>
+            userData['userId'] == currentUserUid)['lastMessageSend'];
+
+        conversationId = doc.id;
+
+        final messages = await converstionsCollection
+            .doc(conversationId)
+            .collection('messages')
+            .where('senderId', isNotEqualTo: currentUserUid)
+            .where('timestamp', isGreaterThan: userLastSeen)
+            .get();
+        lastMessagesLength = messages.docs.length.toString();
+        log('Unread Messages Count: ${messages.docs.length}');
+        log('lastMessagesLength: $lastMessagesLength');
+
+        // Notify listeners of the change
+        notifyListeners();
+      }
+    } catch (e) {
+      log('Error fetching last seen time: $e');
+    }
   }
 }

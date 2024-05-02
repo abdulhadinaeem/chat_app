@@ -288,6 +288,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.2"
+  interpolate_animated:
+    dependency: "direct main"
+    description:
+      name: interpolate_animated
+      sha256: a4e85fd0adc38f92ac1f839698eed1bc9f53c8886eca6133fb069efe781e0894
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.1"
   intl:
     dependency: "direct main"
     description:

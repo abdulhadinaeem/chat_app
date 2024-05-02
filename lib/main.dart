@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
@@ -16,10 +18,18 @@ void main() async {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.purple,
   ));
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await MessagingViewModel().getFirebaseToken();
-  MessagingViewModel().initPushNotifications();
-  MessagingViewModel().initLocalNotifications();
+  if (!kIsWeb) {
+    if (Platform.isAndroid) {
+      await MessagingViewModel().getFirebaseToken();
+      MessagingViewModel().initPushNotifications();
+      MessagingViewModel().initLocalNotifications();
+    }
+  }
   runApp(const MyApp());
 }
 

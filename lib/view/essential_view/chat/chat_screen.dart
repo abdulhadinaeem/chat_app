@@ -30,7 +30,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   late ChatViewModel chatViewModel;
   late Stream<QuerySnapshot> messagesStream = const Stream.empty();
   TextEditingController messageController = TextEditingController();
-  MessagingViewModel messagingViewModel = MessagingViewModel();
   FirebaseAuth auth = FirebaseAuth.instance;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   late ScrollController scrollController;
