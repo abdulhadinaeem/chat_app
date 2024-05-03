@@ -1,14 +1,18 @@
 import 'dart:convert';
-import 'dart:developer';
+
+import 'dart:io';
+import 'package:chat_app/core/constant/logger.dart';
 import 'package:chat_app/model/chat_message_model.dart';
 import 'package:chat_app/model/converstion_model.dart';
 import 'package:chat_app/view_model/messaging_view_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as https;
+import 'package:image_picker/image_picker.dart';
 
 class ChatViewModel with ChangeNotifier {
   String? reciverId;
@@ -17,7 +21,7 @@ class ChatViewModel with ChangeNotifier {
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   CollectionReference converstionsCollection =
       FirebaseFirestore.instance.collection('converstions');
-
+  File? imageFile;
   String? conversationId;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -84,17 +88,16 @@ class ChatViewModel with ChangeNotifier {
       Uri.parse('https://fcm.googleapis.com/fcm/send'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization':
-            'key=AAAAmx_gE_0:APA91bFo_afy4NtGwcdbh_0TVK4qwcVgRSD_C9WoT1cEKbyVXUySwE5jljeV65GC9VW2RikM6Cp9mXaKCoVeP-0gZkTd-wauRyrMm01JH_trPsnwQP8Z5Wov3BPN_2QcjqBatfCzKZSS',
+        'Authorization': 'key=Key...  ',
       },
       body: jsonEncode(messageBody),
     );
 
     if (response.statusCode == 200) {
-      log('Notification sent successfully');
+      logger.d('Notification sent successfully');
       messagingViewModel.initPushNotifications();
     } else {
-      log('Failed to send notification');
+      logger.d('Failed to send notification');
     }
   }
 
@@ -140,7 +143,7 @@ class ChatViewModel with ChangeNotifier {
     ids.sort();
     String chatRoomId = ids.join('_');
     await getIds(ids);
-    log('conversationId: $conversationId');
+    logger.d('conversationId: $conversationId');
     if (conversationId != null) {
       yield* converstionsCollection
           .doc(conversationId!)
@@ -184,7 +187,7 @@ class ChatViewModel with ChangeNotifier {
 
         await docRef.update(updatedData);
       } else {
-        log('Last Seen $lastSeen');
+        logger.d('Last Seen $lastSeen');
         final conversationId = existingConversations.docs.first.id;
         final Map<String, dynamic> existingData =
             existingConversations.docs.first.data() as Map<String, dynamic>;
@@ -197,14 +200,19 @@ class ChatViewModel with ChangeNotifier {
       }
       return true;
     } on Exception catch (e) {
-      log('Error: ${e.toString()}');
+      logger.d('Error: ${e.toString()}');
       return false;
     }
   }
 
   Future<void> updateConversation(
-      String currentUserUid, String receiverId, Timestamp lastSeen) async {
+      String currentUserUid, String reciverId, Timestamp lastSeen) async {
     try {
+      List<String> ids = [currentUserUid, reciverId];
+      ids.sort();
+      String chatRoomId = ids.join('_');
+      await getIds(ids);
+      logger.d(conversationId.toString());
       final conversationDoc =
           await converstionsCollection.doc(conversationId).get();
       if (conversationDoc.exists) {
@@ -217,7 +225,6 @@ class ChatViewModel with ChangeNotifier {
           if (userData['userId'] == currentUserUid) {
             userData['lastMessageSend'] = lastSeen;
             conversationsUserData[i] = userData;
-            break;
           }
         }
 
@@ -227,10 +234,29 @@ class ChatViewModel with ChangeNotifier {
 
         notifyListeners();
       } else {
-        log('Conversation document does not exist');
+        logger.d('Conversation document does not exist');
       }
     } catch (e) {
-      log('Error updating conversation: $e');
+      logger.d('Error updating conversation: $e');
     }
+  }
+
+  Future getImages() async {
+    ImagePicker imagePicker = ImagePicker();
+    await imagePicker.pickImage(source: ImageSource.gallery).then((xFile) {
+      if (xFile != null) {
+        imageFile = File(xFile.path);
+        uploadImagesToFirebase();
+      }
+    });
+  }
+
+  Future uploadImagesToFirebase() async {
+    String fileName = DateTime.now().millisecondsSinceEpoch.toString();
+    var ref =
+        FirebaseStorage.instance.ref().child('images').child("$fileName.jpg");
+    var uploadTask = await ref.putFile(imageFile!);
+    String imagePath = await uploadTask.ref.getDownloadURL();
+    logger.d('ImagePath: $imagePath');
   }
 }

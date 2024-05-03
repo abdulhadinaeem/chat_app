@@ -1,8 +1,6 @@
-import 'dart:developer';
-
 import 'package:chat_app/core/constant/app_images.dart';
+import 'package:chat_app/core/constant/logger.dart';
 import 'package:chat_app/view_model/chat_view_model.dart';
-import 'package:chat_app/view_model/messaging_view_model.dart';
 import 'package:chat_app/widgets/bottom_sheet/custom_bottom_sheet.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -85,6 +83,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               messageController.text, widget.reciverUserToken);
 
           messageController.clear();
+          scrollController.animateTo(scrollController.position.minScrollExtent,
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeIn);
         },
       );
     }
@@ -138,7 +139,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     } else {
                       DocumentSnapshot document = messagesList[index];
                       Map data = document.data() as Map<String, dynamic>;
-                      log('message${data['message']}');
+                      logger.d('message${data['message']}');
                       print('data:$data');
                       final Timestamp timestamp =
                           data['timestamp'] as Timestamp;
@@ -246,7 +247,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                 FirebaseAuth.instance.currentUser!.uid,
                                 widget.reciverUserId,
                                 timeStamp);
-                            Navigator.pop(context);
+                            Navigator.pop(context, true);
                           },
                           icon: const Icon(
                             Icons.arrow_back_ios_new_rounded,
@@ -329,7 +330,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                                       transitionAnimationController:
                                           animationController,
                                       builder: (_) {
-                                        return const CustomBottomSheet();
+                                        return CustomBottomSheet();
                                       },
                                     );
                                   }

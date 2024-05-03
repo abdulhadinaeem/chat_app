@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:developer';
 
-import 'package:chat_app/core/constant/app_globals.dart';
+import 'dart:developer';
 import 'package:chat_app/core/constant/app_images.dart';
 import 'package:chat_app/core/constant/route_names.dart';
 import 'package:chat_app/main.dart';
@@ -9,7 +8,6 @@ import 'package:chat_app/model/user_data_model.dart';
 import 'package:chat_app/view_model/chat_view_model.dart';
 import 'package:chat_app/view_model/messaging_view_model.dart';
 import 'package:chat_app/view_model/user_data_view_model.dart';
-import 'package:chat_app/widgets/progress_indicator/custom_progress_indicator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -27,29 +25,32 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late Stream<QuerySnapshot> userCollection;
   List<UserDataModel> userDataList = [];
+  late ChatViewModel chatViewModel;
 
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
     final provider = Provider.of<UserDataServices>(context, listen: false);
+    chatViewModel = ChatViewModel();
+    provider.lastMessagesLength = '0';
     provider.fetchLastSeenTime().then((value) {
-      log('R-ID: ${provider.reciverId.toString()}');
       provider.startListeningForUnreadMessages();
-      log('IsEmpty: ${provider.lastMessagesLength!.isEmpty}');
     });
-    @override
-    void dispose() {
-      final provider = Provider.of<UserDataServices>(context, listen: false);
-      provider.stopListeningForUnreadMessages();
-      super.dispose();
-    }
 
-    // provider.getNewMessagesCount();
-    // provider.lastMessagesLength = provider.getNewMessagesCount().toString();
     provider.setStatus('Online');
     userCollection =
         FirebaseFirestore.instance.collection('userCollection').snapshots();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+
+    final provider = Provider.of<UserDataServices>(context, listen: false);
+    provider.stopListeningForUnreadMessages();
+    provider.lastMessagesLength = '0';
   }
 
   @override
@@ -57,9 +58,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
     final provider = Provider.of<UserDataServices>(context, listen: false);
     if (state == AppLifecycleState.resumed) {
-      provider.setStatus('Online');
+      Stream.periodic(const Duration(seconds: 1))
+          .listen((_) => provider.setStatus('Online'));
     } else {
-      provider.setStatus('Offline');
+      Stream.periodic(const Duration(seconds: 1))
+          .listen((_) => provider.setStatus('Offline'));
     }
   }
 
@@ -92,7 +95,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 //     element.id == FirebaseAuth.instance.currentUser?.uid);
                 userDataList.add(
                     UserDataModel.fromMap(data.data() as Map<String, dynamic>));
-                log('${userDataList.toList()}');
               }
 
               return Scaffold(
@@ -264,12 +266,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               provider.lastMessagesLength
                                                   .toString(),
                                               style: const TextStyle(
-                                                  color: Colors.white),
+                                                color: Colors.white,
+                                              ),
+                                              textAlign: TextAlign.center,
                                             ),
                                           ),
-                                    onTap: () {
+                                    onTap: () async {
                                       if (userData.name != null &&
                                           userData.id != null) {
+                                        log(FirebaseAuth
+                                            .instance.currentUser!.uid);
+                                        final timeStamp = Timestamp.now();
+                                        chatViewModel.createConversations(
+                                            userData.id!, timeStamp);
                                         Navigator.pushNamed(
                                           context,
                                           RouteNames.chatScreen,
@@ -280,7 +289,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                             'reciverUserToken':
                                                 userData.fcmToken
                                           },
-                                        );
+                                        ).then((result) {
+                                          if (result == true) {
+                                            setState(() {});
+                                          }
+                                        });
                                       } else {
                                         log('Error');
                                       }

@@ -1,8 +1,10 @@
 import 'package:chat_app/core/constant/app_images.dart';
+import 'package:chat_app/view_model/chat_view_model.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
 class AnimatedBottomSheet extends StatelessWidget {
   const AnimatedBottomSheet({super.key});
@@ -17,14 +19,14 @@ class AnimatedBottomSheet extends StatelessWidget {
           parent: ModalRoute.of(context)!.animation!,
           curve: Curves.easeInOut,
           reverseCurve: Curves.easeIn)),
-      child: const CustomBottomSheet(),
+      child: CustomBottomSheet(),
     );
   }
 }
 
 class CustomBottomSheet extends StatelessWidget {
-  const CustomBottomSheet({super.key});
-
+  CustomBottomSheet({super.key});
+  ChatViewModel provider = ChatViewModel();
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -53,7 +55,9 @@ class CustomBottomSheet extends StatelessWidget {
                 color: Colors.blue,
                 image: AppImages.galleryIcon,
                 title: 'Gallery',
-                onTap: () {},
+                onTap: () {
+                  provider.getImages();
+                },
               ),
             ],
           ),

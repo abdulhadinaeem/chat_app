@@ -9,7 +9,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:intl/intl.dart';
 
 class UserDataServices with ChangeNotifier {
   CollectionReference userDataCollection =
@@ -29,6 +28,7 @@ class UserDataServices with ChangeNotifier {
   List onlineUsersList = [];
   final userCollection =
       FirebaseFirestore.instance.collection('userCollection');
+
   void setStatus(String status) async {
     final document = await userCollection
         .where('id', isEqualTo: FirebaseAuth.instance.currentUser!.uid)
@@ -54,12 +54,12 @@ class UserDataServices with ChangeNotifier {
       final document =
           await userCollection.where('email', isEqualTo: email).get();
       if (document.docs.isNotEmpty) {
-        final userDoc = document.docs.first;
-
-        await userCollection.doc(userDoc.id).update({
+        final DocumentReference documentRef = document.docs.first.reference;
+        documentRef.update({
           'fcmToken': value.toString(),
           'status': 'Online',
         });
+
         notifyListeners();
       }
     });
@@ -121,16 +121,9 @@ class UserDataServices with ChangeNotifier {
     notifyListeners();
   }
 
-  getIds() async {
-    List<String> ids = [auth.currentUser!.uid, reciverId!];
-    final existingConversations =
-        await converstionsCollection.where('userIds', isEqualTo: ids).get();
-    conversationId = existingConversations.docs.first.id;
-  }
-
   void startListeningForUnreadMessages() {
     _unreadMessagesSubscription =
-        Stream.periodic(const Duration(seconds: 2)).listen((_) {
+        Stream.periodic(const Duration(seconds: 1)).listen((_) {
       fetchLastSeenTime();
       notifyListeners();
     });
@@ -138,6 +131,8 @@ class UserDataServices with ChangeNotifier {
 
   void stopListeningForUnreadMessages() {
     _unreadMessagesSubscription?.cancel();
+    lastMessagesLength = '0';
+    notifyListeners();
   }
 
   Future<void> fetchLastSeenTime() async {
@@ -163,10 +158,7 @@ class UserDataServices with ChangeNotifier {
             .where('timestamp', isGreaterThan: userLastSeen)
             .get();
         lastMessagesLength = messages.docs.length.toString();
-        log('Unread Messages Count: ${messages.docs.length}');
-        log('lastMessagesLength: $lastMessagesLength');
 
-        // Notify listeners of the change
         notifyListeners();
       }
     } catch (e) {
