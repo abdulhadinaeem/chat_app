@@ -10,6 +10,7 @@ class ChatMessageModel {
   String? imageUrl;
   Timestamp? timestamp;
   String? type;
+  String? replayMessage;
   ChatMessageModel({
     this.message,
     this.reciverId,
@@ -17,6 +18,7 @@ class ChatMessageModel {
     this.imageUrl,
     this.timestamp,
     this.type,
+    this.replayMessage,
   });
 
   ChatMessageModel copyWith({
@@ -26,6 +28,7 @@ class ChatMessageModel {
     String? imageUrl,
     Timestamp? timestamp,
     String? type,
+    String? replayMessage,
   }) {
     return ChatMessageModel(
       message: message ?? this.message,
@@ -34,6 +37,7 @@ class ChatMessageModel {
       imageUrl: imageUrl ?? this.imageUrl,
       timestamp: timestamp ?? this.timestamp,
       type: type ?? this.type,
+      replayMessage: replayMessage ?? this.replayMessage,
     );
   }
 
@@ -45,18 +49,21 @@ class ChatMessageModel {
       'imageUrl': imageUrl,
       'timestamp': timestamp,
       'type': type,
+      'replayMessage': replayMessage,
     };
   }
 
   factory ChatMessageModel.fromMap(Map<String, dynamic> map) {
     return ChatMessageModel(
-      message: map['message'] != null ? map['message'] as String : '',
+      message: map['message'] != null ? map['message'] as String : null,
       reciverId: map['reciverId'] != null ? map['reciverId'] as String : null,
       senderId: map['senderId'] != null ? map['senderId'] as String : null,
       imageUrl: map['imageUrl'] != null ? map['imageUrl'] as String : null,
       timestamp:
           map['timestamp'] != null ? map['timestamp'] as Timestamp : null,
       type: map['type'] != null ? map['type'] as String : null,
+      replayMessage:
+          map['replayMessage'] != null ? map['replayMessage'] as String : null,
     );
   }
 
@@ -67,7 +74,7 @@ class ChatMessageModel {
 
   @override
   String toString() {
-    return 'ChatMessageModel(message: $message, reciverId: $reciverId, senderId: $senderId, imageUrl: $imageUrl, timestamp: $timestamp, type: $type)';
+    return 'ChatMessageModel(message: $message, reciverId: $reciverId, senderId: $senderId, imageUrl: $imageUrl, timestamp: $timestamp, type: $type, replayMessage: $replayMessage)';
   }
 
   @override
@@ -79,7 +86,8 @@ class ChatMessageModel {
         other.senderId == senderId &&
         other.imageUrl == imageUrl &&
         other.timestamp == timestamp &&
-        other.type == type;
+        other.type == type &&
+        other.replayMessage == replayMessage;
   }
 
   @override
@@ -89,6 +97,7 @@ class ChatMessageModel {
         senderId.hashCode ^
         imageUrl.hashCode ^
         timestamp.hashCode ^
-        type.hashCode;
+        type.hashCode ^
+        replayMessage.hashCode;
   }
 }

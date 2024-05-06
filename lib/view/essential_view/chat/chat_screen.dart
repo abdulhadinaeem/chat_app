@@ -1,5 +1,7 @@
 import 'package:chat_app/core/constant/app_images.dart';
 import 'package:chat_app/core/constant/logger.dart';
+import 'package:chat_app/view/essential_view/chat/components/show_image_message.dart';
+import 'package:chat_app/view/essential_view/chat/components/show_text_messages.dart';
 import 'package:chat_app/view_model/chat_view_model.dart';
 import 'package:chat_app/widgets/bottom_sheet/custom_bottom_sheet.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:swipe_to/swipe_to.dart';
 
 class ChatScreen extends StatefulWidget {
   ChatScreen(
@@ -28,13 +31,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   late ChatViewModel chatViewModel;
   late Stream<QuerySnapshot> messagesStream = const Stream.empty();
   TextEditingController messageController = TextEditingController();
-  FirebaseAuth auth = FirebaseAuth.instance;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   late ScrollController scrollController;
-  CollectionReference converstionsCollection =
-      FirebaseFirestore.instance.collection('converstions');
   List messagesList = [];
   late AnimationController animationController;
+  String? replyMessage;
+  final focusNode = FocusNode();
 
   @override
   void initState() {
@@ -75,29 +77,38 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
+  void sendImageMessage() async {
+    if (chatViewModel.imageFile != null) {
+      setState(() {
+        chatViewModel.sendImageMessage(
+            widget.reciverUserId, widget.reciverUserToken);
+        chatViewModel.imageFile = null;
+      });
+    }
+  }
+
   void sendMessage() async {
     if (messageController.text.isNotEmpty) {
-      setState(
-        () {
-          chatViewModel.sendMessage(widget.reciverUserId,
-              messageController.text, widget.reciverUserToken);
+      setState(() {
+        chatViewModel.sendMessage(widget.reciverUserId, messageController.text,
+            widget.reciverUserToken, replyMessage);
 
-          messageController.clear();
-          scrollController.animateTo(scrollController.position.minScrollExtent,
-              duration: const Duration(milliseconds: 700),
-              curve: Curves.easeIn);
-        },
-      );
+        messageController.clear();
+        scrollController.animateTo(scrollController.position.minScrollExtent,
+            duration: const Duration(milliseconds: 700), curve: Curves.easeIn);
+      });
+    } else {
+      sendImageMessage();
     }
   }
 
   Widget buildMessageList() {
     return messagesStream == null
         ? const CircularProgressIndicator()
-        : ChatStreamWidget();
+        : chatStreamWidget();
   }
 
-  NotificationListener<ScrollNotification> ChatStreamWidget() {
+  NotificationListener<ScrollNotification> chatStreamWidget() {
     return NotificationListener(
       onNotification: (ScrollNotification scrollInfo) {
         if (scrollInfo is ScrollEndNotification &&
@@ -115,7 +126,10 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
           if (snapshot.connectionState == ConnectionState.waiting) {
             print('Connection state: Waiting');
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+                child: CircularProgressIndicator(
+                    color: Colors.purple,
+                    backgroundColor: Colors.purple.shade100));
           } else if (snapshot.hasData && snapshot.data != null) {
             messagesList = snapshot.data!.docs.toList();
 
@@ -133,65 +147,50 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   reverse: true,
                   itemBuilder: (context, index) {
                     if (index == messagesList.length) {
-                      return Container(
-                          // height: 70,
-                          );
+                      return Container();
                     } else {
                       DocumentSnapshot document = messagesList[index];
                       Map data = document.data() as Map<String, dynamic>;
-                      logger.d('message${data['message']}');
-                      print('data:$data');
+                      // Check if the message is an image
                       final Timestamp timestamp =
                           data['timestamp'] as Timestamp;
                       final DateTime dateTime = timestamp.toDate();
                       final dateformate =
                           DateFormat('hh:mm a').format(dateTime);
-                      return Container(
-                        alignment: data['senderId'] == auth.currentUser?.uid
-                            ? Alignment.topRight
-                            : Alignment.topLeft,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                  left: 20, right: 20, bottom: 20),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  color: Colors.purple,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(30),
-                                    bottomRight: Radius.circular(30),
-                                    topRight: Radius.circular(30),
+                      if (data['type'] == 'image') {
+                        return chatViewModel.isUploaded
+                            ? const Center(child: CircularProgressIndicator())
+                            : GestureDetector(
+                                onHorizontalDragEnd: (value) {
+                                  if (value.primaryVelocity! > 0) {
+                                    logger.d("Right");
+                                  } else {
+                                    logger.d("Left");
+                                  }
+                                },
+                                child: SwipeTo(
+                                  onRightSwipe: (details) {
+                                    replyToMessage(data['message']);
+                                    focusNode.requestFocus();
+                                  },
+                                  child: ShowImageMessage(
+                                    data: data,
+                                    dateformat: dateformate,
                                   ),
                                 ),
-                                child: Column(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(
-                                        data['message'],
-                                        style: const TextStyle(
-                                            fontSize: 20, color: Colors.white),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(7.0),
-                                      child: Text(
-                                        dateformate,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
+                              );
+                      } else {
+                        return SwipeTo(
+                          onRightSwipe: (d) {
+                            replyToMessage(data['message']);
+                            focusNode.requestFocus();
+                          },
+                          child: ShowTextMessages(
+                            data: data,
+                            dateformat: dateformate,
+                          ),
+                        );
+                      }
                     }
                   },
                 ),
@@ -216,6 +215,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final isREplaying = replyMessage != null;
     return GestureDetector(
       onTap: () {
         FocusManager.instance.primaryFocus?.unfocus();
@@ -315,39 +315,60 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.all(8.0),
-                          child: TextField(
-                            controller: messageController,
-                            maxLines: 4,
-                            minLines: 1,
-                            autocorrect: true,
-                            decoration: InputDecoration(
-                              prefixIcon: IconButton(
-                                onPressed: () {
-                                  if (animationController.isCompleted ||
-                                      animationController.isDismissed) {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      transitionAnimationController:
-                                          animationController,
-                                      builder: (_) {
-                                        return CustomBottomSheet();
-                                      },
-                                    );
-                                  }
-                                },
-                                icon: SvgPicture.asset(
-                                  AppImages.attachFileIcon,
-                                  height: 24,
-                                  color: Colors.grey,
+                          child: Column(
+                            children: [
+                              if (isREplaying) buildReplyBox(),
+                              TextField(
+                                controller: messageController,
+                                maxLines: 4,
+                                minLines: 1,
+                                autocorrect: true,
+                                decoration: InputDecoration(
+                                  prefixIcon: IconButton(
+                                    onPressed: () {
+                                      if (animationController.isCompleted ||
+                                          animationController.isDismissed) {
+                                        showModalBottomSheet(
+                                          context: context,
+                                          transitionAnimationController:
+                                              animationController,
+                                          builder: (_) {
+                                            return CustomBottomSheet(
+                                              reciverId: widget.reciverUserId,
+                                              reciverToken:
+                                                  widget.reciverUserToken,
+                                            );
+                                          },
+                                        );
+                                      }
+                                    },
+                                    icon: SvgPicture.asset(
+                                      AppImages.attachFileIcon,
+                                      height: 24,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  focusColor: Colors.black,
+                                  hintText: 'Message',
+                                  fillColor: Colors.grey.shade100,
+                                  hintStyle:
+                                      const TextStyle(color: Colors.grey),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: isREplaying
+                                            ? Radius.zero
+                                            : const Radius.circular(10),
+                                        topRight: isREplaying
+                                            ? Radius.zero
+                                            : const Radius.circular(10),
+                                        bottomLeft: const Radius.circular(10),
+                                        bottomRight: const Radius.circular(10),
+                                      ),
+                                      borderSide: BorderSide.none),
                                 ),
+                                focusNode: focusNode,
                               ),
-                              focusColor: Colors.black,
-                              hintText: 'Message',
-                              hintStyle: const TextStyle(color: Colors.grey),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
+                            ],
                           ),
                         ),
                       ),
@@ -375,6 +396,96 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           ),
         ),
       ),
+    );
+  }
+
+  void replyToMessage(String message) {
+    setState(() {
+      replyMessage = message;
+    });
+  }
+
+  onCancelReply() {
+    setState(() {
+      replyMessage = null;
+    });
+  }
+
+  Widget buildReplyBox() {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.purple.shade400,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(10),
+          topRight: Radius.circular(10),
+        ),
+      ),
+      child: ReplyMessageWidget(
+        userName: widget.name,
+        onCancelReply: onCancelReply,
+        replyMessage: replyMessage ?? '',
+      ),
+    );
+  }
+}
+
+class ReplyMessageWidget extends StatelessWidget {
+  ReplyMessageWidget({
+    super.key,
+    required this.userName,
+    required this.onCancelReply,
+    required this.replyMessage,
+  });
+  String userName, replyMessage;
+  final VoidCallback onCancelReply;
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          Container(
+            color: Colors.green,
+            width: 4,
+          ),
+          const SizedBox(
+            width: 4,
+          ),
+          Expanded(
+            child: buildReply(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Column buildReply() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              userName,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white),
+            ),
+            GestureDetector(
+              onTap: () => onCancelReply(),
+              child: const Icon(Icons.close),
+            )
+          ],
+        ),
+        const SizedBox(
+          height: 4,
+        ),
+        Text(
+          replyMessage,
+          style: const TextStyle(fontSize: 12, color: Colors.white),
+        )
+      ],
     );
   }
 }

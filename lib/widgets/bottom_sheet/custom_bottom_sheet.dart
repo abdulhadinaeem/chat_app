@@ -1,32 +1,14 @@
 import 'package:chat_app/core/constant/app_images.dart';
 import 'package:chat_app/view_model/chat_view_model.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:provider/provider.dart';
-
-class AnimatedBottomSheet extends StatelessWidget {
-  const AnimatedBottomSheet({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, 1),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-          parent: ModalRoute.of(context)!.animation!,
-          curve: Curves.easeInOut,
-          reverseCurve: Curves.easeIn)),
-      child: CustomBottomSheet(),
-    );
-  }
-}
 
 class CustomBottomSheet extends StatelessWidget {
-  CustomBottomSheet({super.key});
-  ChatViewModel provider = ChatViewModel();
+  CustomBottomSheet(
+      {super.key, required this.reciverId, required this.reciverToken});
+  final String? reciverId;
+  final String? reciverToken;
+  final provider = ChatViewModel();
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -49,14 +31,24 @@ class CustomBottomSheet extends StatelessWidget {
                 color: Colors.red,
                 image: AppImages.cameraIcon,
                 title: 'Camera',
-                onTap: () {},
+                onTap: () {
+                  provider.getImagesFromCamera().then((value) {
+                    provider.sendImageMessage(
+                        reciverId ?? "", reciverToken ?? '');
+                    Navigator.pop(context);
+                  });
+                },
               ),
               bottomSheetIcons(
                 color: Colors.blue,
                 image: AppImages.galleryIcon,
                 title: 'Gallery',
                 onTap: () {
-                  provider.getImages();
+                  provider.getImages().then((value) {
+                    provider.sendImageMessage(
+                        reciverId ?? "", reciverToken ?? '');
+                    Navigator.pop(context);
+                  });
                 },
               ),
             ],

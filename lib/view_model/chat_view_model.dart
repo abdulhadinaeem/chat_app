@@ -17,6 +17,7 @@ import 'package:image_picker/image_picker.dart';
 class ChatViewModel with ChangeNotifier {
   String? reciverId;
   Timestamp? storeLastseen;
+  bool isUploaded = false;
   final FirebaseAuth auth = FirebaseAuth.instance;
   final FirebaseFirestore firestore = FirebaseFirestore.instance;
   CollectionReference converstionsCollection =
@@ -36,8 +37,8 @@ class ChatViewModel with ChangeNotifier {
   }
 
   //SEND MESSAGE
-  Future<void> sendMessage(
-      String receiverId, String message, String receiverToken) async {
+  Future<void> sendMessage(String receiverId, String message,
+      String receiverToken, String? replayMessage) async {
     final String userCurrentId = auth.currentUser!.uid;
     final Timestamp timestamp = Timestamp.now();
 
@@ -52,11 +53,13 @@ class ChatViewModel with ChangeNotifier {
       String conversationId = existingConversations.docs.first.id;
       createConversations(receiverId);
       final model = ChatMessageModel(
-        message: message,
-        senderId: userCurrentId,
-        reciverId: receiverId,
-        timestamp: timestamp,
-      );
+          message: message,
+          senderId: userCurrentId,
+          reciverId: receiverId,
+          timestamp: timestamp,
+          type: message.isEmpty ? 'image' : 'text',
+          imageUrl: message.isEmpty ? imageFile?.path : '',
+          replayMessage: replayMessage ?? "");
 
       await converstionsCollection
           .doc(conversationId)
@@ -66,7 +69,7 @@ class ChatViewModel with ChangeNotifier {
       notifyListeners();
     } else {
       createConversations(receiverId);
-      sendMessage(receiverId, message, receiverToken);
+      sendMessage(receiverId, message, receiverToken, replayMessage);
     }
   }
 
@@ -88,7 +91,8 @@ class ChatViewModel with ChangeNotifier {
       Uri.parse('https://fcm.googleapis.com/fcm/send'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'key=Key...  ',
+        'Authorization':
+            'key=AAAAmx_gE_0:APA91bFo_afy4NtGwcdbh_0TVK4qwcVgRSD_C9WoT1cEKbyVXUySwE5jljeV65GC9VW2RikM6Cp9mXaKCoVeP-0gZkTd-wauRyrMm01JH_trPsnwQP8Z5Wov3BPN_2QcjqBatfCzKZSS',
       },
       body: jsonEncode(messageBody),
     );
@@ -246,17 +250,69 @@ class ChatViewModel with ChangeNotifier {
     await imagePicker.pickImage(source: ImageSource.gallery).then((xFile) {
       if (xFile != null) {
         imageFile = File(xFile.path);
-        uploadImagesToFirebase();
+        uploadImageToFirebase();
       }
     });
   }
 
-  Future uploadImagesToFirebase() async {
+  Future<void> getImagesFromCamera() async {
+    ImagePicker imagePicker = ImagePicker();
+    final XFile? xFile =
+        await imagePicker.pickImage(source: ImageSource.camera);
+    if (xFile != null) {
+      imageFile = File(xFile.path);
+      uploadImageToFirebase();
+    }
+  }
+
+  Future<void> sendImageMessage(String receiverId, String receiverToken) async {
+    final String userCurrentId = auth.currentUser!.uid;
+    final Timestamp timestamp = Timestamp.now();
+
+    List<String> ids = [userCurrentId, receiverId];
+    ids.sort();
+    String chatRoomId = ids.join('_');
+    getIds(ids);
+    final existingConversations =
+        await converstionsCollection.where('userIds', isEqualTo: ids).get();
+
+    if (existingConversations.docs.isNotEmpty) {
+      isUploaded = true;
+      String conversationId = existingConversations.docs.first.id;
+      createConversations(receiverId);
+
+      String imagePath = await uploadImageToFirebase().then((value) async {
+        final model = ChatMessageModel(
+          message: '',
+          senderId: userCurrentId,
+          reciverId: receiverId,
+          timestamp: timestamp,
+          type: 'image',
+          imageUrl: value,
+        );
+
+        await converstionsCollection
+            .doc(conversationId)
+            .collection('messages')
+            .add(model.toMap());
+        sendNotificationToUser(receiverToken, 'Image');
+        isUploaded = false;
+        notifyListeners();
+        return value;
+      });
+    } else {
+      createConversations(receiverId);
+      sendImageMessage(receiverId, receiverToken);
+    }
+  }
+
+  Future<String> uploadImageToFirebase() async {
     String fileName = DateTime.now().millisecondsSinceEpoch.toString();
     var ref =
         FirebaseStorage.instance.ref().child('images').child("$fileName.jpg");
     var uploadTask = await ref.putFile(imageFile!);
     String imagePath = await uploadTask.ref.getDownloadURL();
     logger.d('ImagePath: $imagePath');
+    return imagePath;
   }
 }
